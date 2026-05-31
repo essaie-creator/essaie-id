@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, RefObject } from 'react';
 import { BRAND_COLORS } from '../brandData';
-import { Download, Sparkles, Image as ImageIcon, Settings, Sliders, Type, HelpCircle, Layers, Check, UserCheck, Flame, Zap, AlertCircle } from 'lucide-react';
+import { Download, Sparkles, Image as ImageIcon, Settings, Sliders, Type, HelpCircle, Layers, Check, UserCheck, Flame, Zap, AlertCircle, History, Bookmark, Trash2, Camera, User, Users, Sun, Sunset, Palmtree, RefreshCw, Undo, Eye } from 'lucide-react';
 import JSZip from 'jszip';
 
 interface GraphicPreset {
@@ -127,6 +127,98 @@ export default function SocialMediaKit() {
   const [downloadFormat, setDownloadFormat] = useState<'svg' | 'png'>('png');
   const [copiedNotification, setCopiedNotification] = useState(false);
   const [zippingState, setZippingState] = useState<'idle' | 'generating' | 'done' | 'error'>('idle');
+
+  // Active primary application tab inside the Suite panel
+  const [activeTab, setActiveTab] = useState<'designer' | 'character_creator'>('designer');
+
+  // Stored state for the last 3 user designs (snapshots) in history
+  const [history, setHistory] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem('cove_design_history_v3');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Master design state variables for our Beach Picnic Sticker & Creator Studio
+  const [studioCharacter, setStudioCharacter] = useState<'joe' | 'serena' | 'duo' | 'watermelon_cute' | 'picnic_props'>('joe');
+  const [studioExpression, setStudioExpression] = useState<'shock' | 'laser' | 'laugh' | 'calm' | 'smile'>('smile');
+  const [studioHandheld, setStudioHandheld] = useState<'burger' | 'watermelon' | 'soda' | 'fork' | 'sunglasses' | 'none'>('burger');
+  const [studioScenery, setStudioScenery] = useState<'noon' | 'sunset' | 'night' | 'striped' | 'none'>('noon');
+  const [studioBandanaColor, setStudioBandanaColor] = useState('#FF6B4A');
+  const [studioTeeColor, setStudioTeeColor] = useState('#FF6B4A');
+  const [studioAccessories, setStudioAccessories] = useState<string[]>(['sunglasses', 'earrings', 'palm_leaves']);
+
+  const saveSnapshot = (optionalName?: string) => {
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const snap = {
+      id: `snap-${Date.now()}`,
+      name: optionalName || `Design Snapshot (${timeStr})`,
+      timestamp: timeStr,
+      title,
+      subtitle,
+      ctaText,
+      bgColor,
+      accentColor,
+      stickerType,
+      stickerScale,
+      stickerX,
+      stickerY,
+      borderStyle,
+      presetType: selectedPreset.type,
+      studioCharacter,
+      studioExpression,
+      studioHandheld,
+      studioScenery,
+      studioBandanaColor,
+      studioTeeColor,
+      studioAccessories
+    };
+
+    setHistory((prev) => {
+      // Filter out duplicate identical titles for clean lists
+      const filtered = prev.filter(item => item.title !== snap.title || item.stickerType !== snap.stickerType || item.bgColor !== snap.bgColor);
+      const updated = [snap, ...filtered].slice(0, 3);
+      localStorage.setItem('cove_design_history_v3', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const loadSnapshot = (snap: any) => {
+    if (!snap) return;
+    setTitle(snap.title || '');
+    setSubtitle(snap.subtitle || '');
+    setCtaText(snap.ctaText || '');
+    setBgColor(snap.bgColor || '#FF6B4A');
+    setAccentColor(snap.accentColor || '#FAF6F0');
+    setStickerType(snap.stickerType || 'joe-shocked');
+    setStickerScale(snap.stickerScale || 1.0);
+    setStickerX(snap.stickerX || 50);
+    setStickerY(snap.stickerY || 50);
+    setBorderStyle(snap.borderStyle || 'retro');
+    
+    // load studio configs
+    if (snap.studioCharacter) setStudioCharacter(snap.studioCharacter);
+    if (snap.studioExpression) setStudioExpression(snap.studioExpression);
+    if (snap.studioHandheld) setStudioHandheld(snap.studioHandheld);
+    if (snap.studioScenery) setStudioScenery(snap.studioScenery);
+    if (snap.studioBandanaColor) setStudioBandanaColor(snap.studioBandanaColor);
+    if (snap.studioTeeColor) setStudioTeeColor(snap.studioTeeColor);
+    if (snap.studioAccessories) setStudioAccessories(snap.studioAccessories);
+    
+    // revert preset type
+    const matchingPreset = PRESETS.find(p => p.type === snap.presetType);
+    if (matchingPreset) setSelectedPreset(matchingPreset);
+  };
+
+  const removeSnapshot = (id: string) => {
+    setHistory((prev) => {
+      const updated = prev.filter(item => item.id !== id);
+      localStorage.setItem('cove_design_history_v3', JSON.stringify(updated));
+      return updated;
+    });
+  };
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -393,6 +485,7 @@ export default function SocialMediaKit() {
       img.src = url;
     }
 
+    saveSnapshot();
     setCopiedNotification(true);
     setTimeout(() => setCopiedNotification(false), 3000);
   };
@@ -423,6 +516,7 @@ export default function SocialMediaKit() {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
         
+        saveSnapshot();
         setZippingState('done');
         setTimeout(() => setZippingState('idle'), 4000);
       } else {
@@ -480,6 +574,7 @@ export default function SocialMediaKit() {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
         
+        saveSnapshot();
         setZippingState('done');
         setTimeout(() => setZippingState('idle'), 4000);
       }
@@ -490,10 +585,414 @@ export default function SocialMediaKit() {
     }
   };
 
+  // Render function for Beach Picnic Sticker & Creator Studio
+  const renderStudioStickerJSX = () => {
+    return (
+      <g>
+        {/* Gradients */}
+        <defs>
+          <linearGradient id="sunsetGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#F43F5E" />
+            <stop offset="60%" stopColor="#F97316" />
+            <stop offset="100%" stopColor="#EAB308" />
+          </linearGradient>
+          <linearGradient id="nightGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#1E1B4B" />
+            <stop offset="50%" stopColor="#0F172A" />
+            <stop offset="100%" stopColor="#020617" />
+          </linearGradient>
+          <linearGradient id="burgerBun" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#F59E0B" />
+            <stop offset="100%" stopColor="#D97706" />
+          </linearGradient>
+          <pattern id="basketCheck" width="10" height="10" patternUnits="userSpaceOnUse">
+            <rect width="5" height="5" fill="#EF4444" />
+            <rect x="5" y="5" width="5" height="5" fill="#EF4444" />
+            <rect x="5" width="5" height="5" fill="#FAF6F0" />
+            <rect y="5" width="5" height="5" fill="#FAF6F0" />
+          </pattern>
+        </defs>
+
+        {/* 1. Backdrop Scenery */}
+        {studioScenery === 'noon' && (
+          <g>
+            {/* Sunny Sky Disk */}
+            <circle cx="0" cy="0" r="95" fill="#E0F2FE" stroke="#1C1917" strokeWidth="6" />
+            <circle cx="35" cy="-35" r="30" fill="#FDE047" stroke="#1C1917" strokeWidth="5" />
+            <path d="M-60,-5 C-50,-15 -35,-15 -25,-5 C-15,-15 0,-15 10,-5" fill="none" stroke="#38BDF8" strokeWidth="4" strokeLinecap="round" />
+            {/* Distant palm tiny outline sketch */}
+            <path d="M-85,30 C-75,10 -60,20 -50,45" fill="none" stroke="#047857" strokeWidth="3" />
+          </g>
+        )}
+
+        {studioScenery === 'sunset' && (
+          <g>
+            <circle cx="0" cy="0" r="95" fill="url(#sunsetGrad)" stroke="#1C1917" strokeWidth="6" />
+            {/* Glowing gold sun sinking */}
+            <circle cx="0" cy="20" r="35" fill="#FEF08A" stroke="#1C1917" strokeWidth="5" />
+            <line x1="-80" y1="20" x2="80" y2="20" stroke="#1C1917" strokeWidth="4" />
+            <line x1="-60" y1="35" x2="60" y2="35" stroke="#1C1917" strokeWidth="3" />
+          </g>
+        )}
+
+        {studioScenery === 'night' && (
+          <g>
+            <circle cx="0" cy="0" r="95" fill="url(#nightGrad)" stroke="#1C1917" strokeWidth="6" />
+            {/* Crescent moon yellow */}
+            <path d="M40,-40 C40,-20 20,0 0,0 C15,-5 25,-20 25,-40 C25,-50 20,-55 15,-60 C30,-55 40,-50 40,-40 Z" fill="#FEF08A" stroke="#1C1917" strokeWidth="4" />
+            {/* Twinkle stars */}
+            <circle cx="-40" cy="-30" r="2" fill="#FAF6F0" />
+            <circle cx="-15" cy="-50" r="3" fill="#FDE047" />
+            <circle cx="-60" cy="10" r="2" fill="#FAF6F0" />
+            <circle cx="50" cy="20" r="2.5" fill="#FAF6F0" />
+          </g>
+        )}
+
+        {studioScenery === 'striped' && (
+          <g>
+            <rect x="-95" y="-95" width="190" height="190" rx="40" fill="#F59E0B" stroke="#1C1917" strokeWidth="6" />
+            {/* Colorful layout picnic stripes aligned with mat */}
+            <rect x="-95" y="-60" width="190" height="25" fill="#EF4444" />
+            <rect x="-95" y="-15" width="190" height="25" fill="#FAF6F0" />
+            <rect x="-95" y="30" width="190" height="25" fill="#0D9488" />
+            {/* Outline grid overlay on stripes */}
+            <rect x="-95" y="-95" width="190" height="190" rx="40" fill="none" stroke="#1C1917" strokeWidth="6" />
+          </g>
+        )}
+
+        {/* Palm leaves overlays (always cool for beach side effects) */}
+        {studioAccessories.includes('palm_leaves') && (
+          <g opacity="0.9">
+            <path d="M-105,-85 C-90,-100 -50,-105 -20,-115 C-45,-95 -50,-65 -65,-70 Z" fill="#047857" stroke="#1C1917" strokeWidth="3" />
+            <path d="M105,-85 C90,-100 50,-105 20,-115 C45,-95 50,-65 65,-70 Z" fill="#047857" stroke="#1C1917" strokeWidth="3" />
+          </g>
+        )}
+
+        {/* 2. Base Character Render Block */}
+        {studioCharacter === 'joe' && (
+          <g transform="translate(0, 5)">
+            {/* Neck */}
+            <rect x="-24" y="30" width="48" height="60" fill="#CD7F5D" rx="10" stroke="#1C1917" strokeWidth="8" />
+            <path d="M-24,60 C-10,75 10,75 24,60" fill="none" stroke="#9A593E" strokeWidth="6" />
+
+            {/* Ear Ring */}
+            {studioAccessories.includes('earrings') && (
+              <circle cx="-50" cy="5" r="14" fill="none" stroke="#F59E0B" strokeWidth="6" />
+            )}
+
+            {/* Head Silhouette */}
+            <path d="M-50,-20 C-50,-80 -30,-90 0,-90 C30,-90 50,-80 50,-20 C50,40 30,50 0,50 C-30,50 -50,40 -50,-20 Z" fill="#E69C73" stroke="#1C1917" strokeWidth="8" />
+
+            {/* Spiky Cool Hair */}
+            <path d="M-55,-60 L-72,-105 L-40,-95 L-42,-124 L-15,-105 L-10,-132 L15,-110 L25,-128 L38,-95 L58,-98 L45,-65 L55,-50" fill="#1C1917" stroke="#1C1917" strokeWidth="6" />
+            
+            {/* Side Shaved Razor Slits */}
+            <path d="M-45,-25 L-30,-25" stroke="#FAF6F0" strokeWidth="4.5" strokeLinecap="round" />
+            <path d="M-43,-15 L-33,-15" stroke="#FAF6F0" strokeWidth="4.5" strokeLinecap="round" />
+
+            {/* Orange Tee shirt shoulders */}
+            <path d="M-58,74 C-42,65 -20,68 0,68 C20,68 42,65 58,74 L70,120 L-70,120 Z" fill={studioTeeColor} stroke="#1C1917" strokeWidth="8" />
+
+            {/* Sunglasses hanging casually */}
+            <path d="M-12,74 L12,74" stroke="#1C1917" strokeWidth="6" />
+            <rect x="-24" y="78" width="18" height="14" rx="4" fill="#0F172A" stroke="#1C1917" strokeWidth="4" />
+            <rect x="6" y="78" width="18" height="14" rx="4" fill="#0F172A" stroke="#1C1917" strokeWidth="4" />
+
+            {/* Facial expression layer rendering */}
+            {renderStudioExpression(studioExpression, -20, 20)}
+          </g>
+        )}
+
+        {studioCharacter === 'serena' && (
+          <g transform="translate(0, 5)">
+            {/* Back Hair */}
+            <path d="M-62,-40 C-102,-30 -115,65 -75,115 C-33,145 33,145 75,115 C115,65 102,-30 62,-40 Z" fill="#1C1917" stroke="#1C1917" strokeWidth="7" />
+            
+            {/* Neck */}
+            <rect x="-20" y="30" width="40" height="50" fill="#C87652" rx="8" stroke="#1C1917" strokeWidth="8" />
+
+            {/* Ear Ring */}
+            {studioAccessories.includes('earrings') && (
+              <g>
+                <circle cx="-47" cy="5" r="14" fill="none" stroke="#F59E0B" strokeWidth="6" />
+                <circle cx="47" cy="5" r="14" fill="none" stroke="#F59E0B" strokeWidth="6" />
+              </g>
+            )}
+
+            {/* Head Face Silhouette */}
+            <path d="M-45,-20 C-45,-75 -25,-85 0,-85 C25,-85 45,-75 45,-20 C45,35 25,45 0,45 C-25,45 -45,35 -45,-20 Z" fill="#DF9269" stroke="#1C1917" strokeWidth="8" />
+
+            {/* Halter Top shoulders with dynamic strap */}
+            <path d="M-40,75 C-15,55 15,55 40,75 L52,120 L-52,120 Z" fill="#BE123C" stroke="#1C1917" strokeWidth="8" />
+            <path d="M-15,75 L-2,44" stroke="#1C1917" strokeWidth="6" />
+            <path d="M15,75 L2,44" stroke="#1C1917" strokeWidth="6" />
+
+            {/* Orange Bandana Headdress */}
+            {studioAccessories.includes('bandana') && (
+              <g>
+                <path d="M-48,-55 C-30,-75 30,-75 48,-55 C52,-45 52,-40 48,-44 C30,-64 -30,-64 -48,-44 C-52,-40 -52,-45 -48,-55 Z" fill={studioBandanaColor} stroke="#1C1917" strokeWidth="6" />
+                {/* Cute bandana knot/ears */}
+                <path d="M-35,-70 C-55,-95 -15,-90 -25,-72 Z" fill={studioBandanaColor} stroke="#1C1917" strokeWidth="5" />
+                <path d="M-22,-70 C-18,-100 15,-92 -2,-71 Z" fill={studioBandanaColor} stroke="#1C1917" strokeWidth="5" />
+              </g>
+            )}
+
+            {/* Facial expression layer rendering */}
+            {renderStudioExpression(studioExpression, -18, 18)}
+          </g>
+        )}
+
+        {studioCharacter === 'duo' && (
+          <g>
+            {/* Red Mat background */}
+            <path d="M-90,60 L90,60 L70,110 L-70,110 Z" fill="#EF4444" stroke="#1C1917" strokeWidth="6" />
+            <path d="M-70,60 L-50,110" stroke="#FAF6F0" strokeWidth="4" />
+            <path d="M0,60 L0,110" stroke="#FEF08A" strokeWidth="4" />
+            <path d="M70,60 L50,110" stroke="#FAF6F0" strokeWidth="4" />
+
+            {/* Left Joe character */}
+            <g transform="translate(-32, 10) scale(0.85)">
+              <rect x="-16" y="30" width="32" height="40" fill="#A15D3F" rx="6" stroke="#1C1917" strokeWidth="6" />
+              <path d="M-35,-15 C-35,-60 -20,-70 0,-70 C20,-70 35,-60 35,-15 C35,25 20,32 0,32 C-20,32 -35,25 -35,-15 Z" fill="#E69C73" stroke="#1C1917" strokeWidth="6" />
+              <path d="M-40,-45 L-50,-70 L-25,-65 L-27,-85 L-5,-70 L-2,-90 L15,-70 L25,-85 L32,-60 L45,-62 L35,-40" fill="#1C1917" stroke="#1C1917" strokeWidth="5" />
+              <path d="M-35,60 C-20,50 20,50 35,60 L45,100 L-45,100 Z" fill={studioTeeColor} stroke="#1C1917" strokeWidth="6" />
+              {renderStudioExpression(studioExpression, -14, 14)}
+            </g>
+
+            {/* Right Serena character */}
+            <g transform="translate(32, 12) scale(0.85)">
+              <path d="M-45,-30 C-75,-20 -85,45 -55,80 C-20,100 20,100 55,80 C75,45 65,-20 45,-30 Z" fill="#1C1917" stroke="#1C1917" strokeWidth="5" />
+              <rect x="-16" y="30" width="32" height="40" fill="#9A593E" rx="6" stroke="#1C1917" strokeWidth="6" />
+              <path d="M-35,-15 C-35,-60 -20,-70 0,-70 C20,-70 35,-60 35,-15 C35,25 20,32 0,32 C-20,32 -35,25 -35,-15 Z" fill="#DF9269" stroke="#1C1917" strokeWidth="6" />
+              <path d="M-40,60 C-20,50 20,50 35,60 L45,100 L-45,100 Z" fill="#EF4444" stroke="#1C1917" strokeWidth="6" />
+              <path d="M-38,-45 C-20,-60 20,-60 38,-45" fill="none" stroke={studioBandanaColor} strokeWidth="6" />
+              {renderStudioExpression(studioExpression === 'shock' ? 'smile' : studioExpression, -14, 14)}
+            </g>
+
+            {/* Picnic Item Overlay inside Duo (Watermelon slice on the middle grass mat) */}
+            <g transform="translate(0, 70) scale(0.6)">
+              <path d="M-30,-10 C-30,25 30,25 30,-10 Z" fill="#047857" stroke="#1C1917" strokeWidth="6" />
+              <path d="M-22,-10 C-22,18 22,18 22,-10 Z" fill="#FF6B4A" stroke="#1C1917" strokeWidth="4" />
+              <circle cx="-10" cy="2" r="1.5" fill="#1C1917" />
+              <circle cx="10" cy="2" r="1.5" fill="#1C1917" />
+            </g>
+          </g>
+        )}
+
+        {studioCharacter === 'watermelon_cute' && (
+          <g transform="translate(0, 10)">
+            {/* Watermelon Wedge */}
+            <path d="M-85,-25 C-85,55 85,55 85,-25 Z" fill="#10B981" stroke="#1C1917" strokeWidth="8" />
+            <path d="M-72,-25 C-72,43 72,43 72,-25 Z" fill="#FF6B4A" stroke="#1C1917" strokeWidth="6" />
+
+            {/* Little black seeds scattered around representing true watermelon textures */}
+            <path d="M-50,-5 L-48,-10 L-52,-10 Z" fill="#1C1917" stroke="#1C1917" strokeWidth="1" />
+            <path d="M50,-5 L52,-10 L48,-10 Z" fill="#1C1917" stroke="#1C1917" strokeWidth="1" />
+            <path d="M-25,18 L-23,13 L-27,13 Z" fill="#1C1917" stroke="#1C1917" strokeWidth="1" />
+            <path d="M25,18 L27,13 L23,13 Z" fill="#1C1917" stroke="#1C1917" strokeWidth="1" />
+
+            {/* Rosy cheeks */}
+            <circle cx="-42" cy="0" r="10" fill="#EF4444" opacity="0.4" />
+            <circle cx="42" cy="0" r="10" fill="#EF4444" opacity="0.4" />
+
+            {/* Facial expressions positioned on the Melon center */}
+            {renderStudioExpression(studioExpression, -22, 22)}
+          </g>
+        )}
+
+        {studioCharacter === 'picnic_props' && (
+          <g transform="translate(0, 10)">
+            {/* Woven Picnic Basket */}
+            <rect x="-65" y="0" width="130" height="75" rx="14" fill="#6B4F27" stroke="#1C1917" strokeWidth="8" />
+            <path d="M-65,25 L65,25" stroke="#1c1917" strokeWidth="5" />
+            <path d="M-65,50 L65,50" stroke="#1c1917" strokeWidth="5" />
+            <path d="M-30,0 L-30,75" stroke="#1c1917" strokeWidth="4" />
+            <path d="M30,0 L30,75" stroke="#1c1917" strokeWidth="4" />
+            
+            {/* Basket Handle */}
+            <path d="M-55,0 C-55,-45 55,-45 55,0" fill="none" stroke="#6B4F27" strokeWidth="10" />
+            <path d="M-55,0 C-55,-45 55,-45 55,0" fill="none" stroke="#1C1917" strokeWidth="4" />
+
+            {/* Red / White Picnic Mat cloth popping out */}
+            <path d="M-40,5 C-55,-25 -10,-35 0,5 Z" fill="url(#basketCheck)" stroke="#1C1917" strokeWidth="4" />
+            <path d="M-10,5 C5,-30 45,-25 35,5 Z" fill="url(#basketCheck)" stroke="#1C1917" strokeWidth="4" />
+
+            {/* Tiny delicious burger on top representing picnic abundance! */}
+            <g transform="translate(0, -32) scale(0.6)">
+              <rect x="-30" y="5" width="60" height="8" rx="2" fill="#FAF6F0" stroke="#1C1917" strokeWidth="4" />
+              <path d="M-24,5 Q0,-12 24,5 Z" fill="#F59E0B" stroke="#1C1917" strokeWidth="4" />
+              <path d="M-26,5 L26,5" stroke="#10B981" strokeWidth="5" strokeLinecap="round" />
+              <rect x="-22" y="10" width="44" height="6" fill="#78350F" stroke="#1C1917" strokeWidth="4" />
+              <rect x="-25" y="15" width="50" height="6" rx="2" fill="#FBBF24" stroke="#1C1917" strokeWidth="3" />
+            </g>
+          </g>
+        )}
+
+        {/* 3. Handheld Accessory/Prop Layer */}
+        {renderStudioHandheldProp(studioHandheld)}
+
+        {/* 4. Active Sunglasses Accessory Wear overlay */}
+        {studioAccessories.includes('sunglasses') && studioCharacter !== 'watermelon_cute' && studioCharacter !== 'picnic_props' && (
+          <g transform={studioCharacter === 'duo' ? 'translate(-25, 0) scale(0.7)' : 'translate(0, 5)'}>
+            {/* Cool designer beach shades */}
+            <path d="M-36,-22 L36,-22" stroke="#1C1917" strokeWidth="8" strokeLinecap="round" />
+            <rect x="-32" y="-20" width="26" height="20" rx="6" fill="#0D9488" stroke="#1C1917" strokeWidth="5" />
+            <rect x="6" y="-20" width="26" height="20" rx="6" fill="#0D9488" stroke="#1C1917" strokeWidth="5" />
+            {/* Sunglasses lens highlight shine */}
+            <path d="M-28,-14 L-20,-6" stroke="#FAF6F0" strokeWidth="3.5" strokeLinecap="round" opacity="0.65" />
+            <path d="M10,-14 L18,-6" stroke="#FAF6F0" strokeWidth="3.5" strokeLinecap="round" opacity="0.65" />
+          </g>
+        )}
+      </g>
+    );
+  };
+
+  // Render Sub-Facial Expressions
+  const renderStudioExpression = (ex: string, lx: number, rx: number) => {
+    switch (ex) {
+      case 'smile':
+        return (
+          <g>
+            <path d={`M${lx},-22 Q${lx + 5},-12 ${lx + 10},-22`} fill="none" stroke="#1C1917" strokeWidth="6" strokeLinecap="round" />
+            <path d={`M${rx - 10},-22 Q${rx - 5},-12 ${rx},-23`} fill="none" stroke="#1C1917" strokeWidth="6" strokeLinecap="round" />
+            <path d="M-15,6 Q0,22 15,6 Z" fill="#EF4444" stroke="#1C1917" strokeWidth="5" />
+            <path d="M-11,8 L11,8" stroke="#FAF6F0" strokeWidth="4" />
+          </g>
+        );
+      case 'shock':
+        return (
+          <g>
+            <circle cx={lx + 4} cy="-22" r="13" fill="#FAF6F0" stroke="#1C1917" strokeWidth="6" />
+            <circle cx={rx - 4} cy="-22" r="13" fill="#FAF6F0" stroke="#1C1917" strokeWidth="6" />
+            <circle cx={lx + 4} cy="-22" r="4" fill="#1C1917" />
+            <circle cx={rx - 4} cy="-22" r="4" fill="#1C1917" />
+            <path d="M-20,-38 C-15,-42 -5,-40 -5,-38" fill="none" stroke="#1C1917" strokeWidth="5" strokeLinecap="round" />
+            <path d="M20,-38 C15,-42 5,-40 5,-38" fill="none" stroke="#1C1917" strokeWidth="5" strokeLinecap="round" />
+            
+            {/* Screaming gaping mouth */}
+            <path d="M-22,8 C-22,-6 22,-6 22,8 C22,28 12,38 0,38 C-12,38 -22,28 -22,8 Z" fill="#1C1917" />
+            <path d="M-15,28 C-8,18 8,18 15,28" fill="#FF6B4A" />
+            <path d="M-16,8 L16,8" stroke="#FAF6F0" strokeWidth="6" strokeLinecap="round" />
+          </g>
+        );
+      case 'laser':
+        return (
+          <g>
+            <circle cx={lx + 4} cy="-20" r="10" fill="#FAF6F0" stroke="#1C1917" strokeWidth="5" />
+            <circle cx={rx - 4} cy="-20" r="10" fill="#FAF6F0" stroke="#1C1917" strokeWidth="5" />
+            
+            {/* Glowing neon laser shafts */}
+            <line x1={lx + 4} y1="-20" x2="-230" y2="-45" stroke="#EF4444" strokeWidth="18" opacity="0.8" strokeLinecap="round" />
+            <line x1={lx + 4} y1="-20" x2="-230" y2="-45" stroke="#FAF6F0" strokeWidth="6" strokeLinecap="round" />
+            <circle cx={lx + 4} cy="-20" r="7" fill="#FF885E" />
+
+            <line x1={rx - 4} y1="-20" x2="230" y2="-45" stroke="#EF4444" strokeWidth="18" opacity="0.8" strokeLinecap="round" />
+            <line x1={rx - 4} y1="-20" x2="230" y2="-45" stroke="#FAF6F0" strokeWidth="6" strokeLinecap="round" />
+            <circle cx={rx - 4} cy="-20" r="7" fill="#FF885E" />
+
+            {/* Confident battle grin */}
+            <path d="M-18,12 Q0,26 18,12" fill="none" stroke="#1C1917" strokeWidth="6" strokeLinecap="round" />
+          </g>
+        );
+      case 'laugh':
+        return (
+          <g>
+            {/* Squinty Laughing Eyes < and > */}
+            <path d={`M${lx - 4},-26 L${lx + 6},-20 L${lx - 4},-14`} fill="none" stroke="#1C1917" strokeWidth="6" strokeLinejoin="round" strokeLinecap="round" />
+            <path d={`M${rx + 4},-26 L${rx - 6},-20 L${rx + 4},-14`} fill="none" stroke="#1C1917" strokeWidth="6" strokeLinejoin="round" strokeLinecap="round" />
+            <path d="M-22,2 C-22,24 22,24 22,2 Z" fill="#1C1917" stroke="#1C1917" strokeWidth="4" />
+            <path d="M-12,14 C-5,6 5,6 12,14" fill="#FF6B4A" />
+            <path d="M-18,2 L18,2" stroke="#FAF6F0" strokeWidth="4" />
+          </g>
+        );
+      case 'calm':
+        return (
+          <g>
+            {/* Peaceful Happy Sleep Curved Arcs */}
+            <path d={`M${lx},-23 Q${lx + 5},-28 ${lx + 10},-23`} fill="none" stroke="#1C1917" strokeWidth="5" strokeLinecap="round" />
+            <path d={`M${rx - 10},-23 Q${rx - 5},-28 ${rx},-23`} fill="none" stroke="#1C1917" strokeWidth="5" strokeLinecap="round" />
+            <path d="M-12,8 Q0,16 12,8" fill="none" stroke="#1C1917" strokeWidth="5" strokeLinecap="round" />
+          </g>
+        );
+      default:
+        return null;
+    }
+  };
+
+  // Render Props Handheld Item Layer
+  const renderStudioHandheldProp = (prop: string) => {
+    switch (prop) {
+      case 'burger':
+        return (
+          <g transform="translate(48, 48) scale(0.9)">
+            {/* Multi-layered vector burger */}
+            <path d="M-24,0 Q0,-18 24,0 Z" fill="url(#burgerBun)" stroke="#1C1917" strokeWidth="4" />
+            <path d="M-27,-1 L27,-1" stroke="#22C55E" strokeWidth="4" strokeLinecap="round" />
+            {/* Cheese */}
+            <path d="M-24,3 L-12,10 L12,3 L24,3 Z" fill="#FBBF24" />
+            {/* Meat Patty */}
+            <rect x="-24" y="4" width="48" height="6" fill="#78350F" stroke="#1C1917" strokeWidth="3" />
+            {/* Bottom Bun */}
+            <path d="M-24,10 L24,10 L20,16 L-20,16 Z" fill="url(#burgerBun)" stroke="#1C1917" strokeWidth="4" />
+            {/* Sparkles */}
+            <path d="M-30,-20 L-25,-15" stroke="#FF6B4A" strokeWidth="3" />
+            <path d="M30,-20 L25,-15" stroke="#FF6B4A" strokeWidth="3" />
+          </g>
+        );
+      case 'watermelon':
+        return (
+          <g transform="translate(45, 52) scale(0.9)">
+            {/* Watermelon slice with seed detail */}
+            <path d="M-30,-5 C-30,22 30,22 30,-5 Z" fill="#047857" stroke="#1C1917" strokeWidth="5" />
+            <path d="M-24,-5 C-24,16 24,16 24,-5 Z" fill="#FF6B4A" stroke="#1C1917" strokeWidth="4" />
+            {/* Tiny seeds */}
+            <circle cx="-10" cy="2" r="1.5" fill="#1C1917" />
+            <circle cx="8" cy="2" r="1.5" fill="#1C1917" />
+            <circle cx="0" cy="-2" r="1.5" fill="#1C1917" />
+          </g>
+        );
+      case 'soda':
+        return (
+          <g transform="translate(50, 42) scale(0.9)">
+            {/* Orange sparkling beach soda bottle with water condensation specs */}
+            <rect x="-10" y="2" width="20" height="42" rx="6" fill="#F97316" stroke="#1C1917" strokeWidth="4" />
+            {/* Label with dynamic water waves */}
+            <rect x="-10" y="16" width="20" height="15" fill="#3B82F6" />
+            <text x="0" y="27" textAnchor="middle" fill="#FAF6F0" fontSize="8" fontWeight="bold">COVE</text>
+            {/* White drinking straw */}
+            <path d="M2,2 L10,-15 L22,-18" stroke="#FAF6F0" strokeWidth="4" fill="none" strokeLinecap="round" />
+            <path d="M2,2 L10,-15 L22,-18" stroke="#EF4444" strokeWidth="4" strokeDasharray="3,3" fill="none" strokeLinecap="round" />
+          </g>
+        );
+      case 'fork':
+        return (
+          <g transform="translate(48, 48) scale(0.95)">
+            {/* Precise fork alignment like in prompt picture */}
+            <path d="M-15,25 L15,-10" stroke="#9A3412" strokeWidth="4" strokeLinecap="round" />
+            {/* Shiny metallic prongs */}
+            <path d="M10,-15 L25,-30 M15,-10 L30,-25 M5,-20 L20,-35" stroke="#A8A29E" strokeWidth="3" strokeLinecap="round" />
+            <line x1="12" y1="-12" x2="22" y2="-22" stroke="#A8A29E" strokeWidth="6" />
+          </g>
+        );
+      case 'sunglasses':
+        return (
+          <g transform="translate(45, 52) scale(0.85)">
+            <rect x="-24" y="-10" width="20" height="15" rx="4" fill="#0D9488" stroke="#1C1917" strokeWidth="4" />
+            <rect x="4" y="-10" width="20" height="15" rx="4" fill="#0D9488" stroke="#1C1917" strokeWidth="4" />
+            <path d="M-4,-4 L4,-4" stroke="#1C1917" strokeWidth="4" />
+          </g>
+        );
+      default:
+        return null;
+    }
+  };
+
   // Helper vectors for rendering stickers inside JSX
   // Direct vector JSX definition for stickers
   const renderSvgStickerJSX = (type: string) => {
     switch (type) {
+      case 'custom-creator':
+        return renderStudioStickerJSX();
       case 'joe-shocked':
         return (
           <g>
@@ -736,19 +1235,50 @@ export default function SocialMediaKit() {
         </div>
       </div>
 
+      {/* Universal Workspace Tab Selector */}
+      <div className="flex border-b-2 border-stone-900 gap-1 overflow-x-auto scrollbar-none pb-0.5">
+        <button
+          onClick={() => setActiveTab('designer')}
+          className={`flex items-center gap-2 px-5 py-2.5 text-xs font-bold font-space rounded-t-xl border-t-2 border-r-2 border-l-2 border-stone-900 transition-all cursor-pointer transition-colors duration-150 shrink-0 ${
+            activeTab === 'designer'
+              ? 'bg-stone-900 text-white shadow-[0px_2.5px_0px_0px_rgba(28,25,23,1)]'
+              : 'bg-white text-stone-600 hover:text-stone-900 hover:bg-stone-50 border-stone-900'
+          }`}
+        >
+          <Sliders className="w-4 h-4 text-emerald-500" />
+          <span>⚡ Campaign Assets & Cards Designer</span>
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab('character_creator');
+            setStickerType('custom-creator'); // Auto-bridge custom sticker selection in template
+          }}
+          className={`flex items-center gap-2 px-5 py-2.5 text-xs font-bold font-space rounded-t-xl border-t-2 border-r-2 border-l-2 border-stone-900 transition-all cursor-pointer transition-colors duration-150 shrink-0 ${
+            activeTab === 'character_creator'
+              ? 'bg-stone-900 text-white shadow-[0px_2.5px_0px_0px_rgba(28,25,23,1)]'
+              : 'bg-white text-stone-600 hover:text-stone-900 hover:bg-stone-50 border-stone-900'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
+          <span>🍉 Beach Picnic Sticker & Creator Studio</span>
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Side: Dynamic Controls Panel */}
-        <div className="lg:col-span-5 bg-[#FAF6F0] border-2 border-stone-900 p-6 rounded-3xl shadow-[4px_4px_0px_0px_rgba(28,25,23,1)] space-y-6">
-          <div className="flex items-center justify-between border-b border-stone-200 pb-3">
-            <h3 className="text-xs font-extrabold uppercase tracking-widest text-[#FF6B4A] font-mono flex items-center gap-1.5">
-              <Sliders className="w-4 h-4" /> Layout Configurator
-            </h3>
-            <span className="text-[10px] font-mono bg-stone-250 px-2 py-0.5 rounded text-stone-600">
-              Active Studio Canvas
-            </span>
-          </div>
-
-          {/* Quick presets selectors */}
+        <div className="lg:col-span-5 bg-[#FAF6F0] border-2 border-stone-900 p-6 rounded-3xl shadow-[4px_4px_0px_0px_rgba(28,25,23,1)]">
+          {activeTab === 'designer' ? (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between border-b border-stone-200 pb-3">
+                <h3 className="text-xs font-extrabold uppercase tracking-widest text-[#FF6B4A] font-mono flex items-center gap-1.5">
+                  <Sliders className="w-4 h-4" /> Layout Configurator
+                </h3>
+                <span className="text-[10px] font-mono bg-[#E0F2FE] border border-sky-300 text-sky-800 px-2 py-0.5 rounded font-bold">
+                  Card Presets
+                </span>
+              </div>
+    
+              {/* Quick presets selectors */}
           <div className="space-y-2">
             <label className="text-xs font-bold text-stone-700 block">Launch a Campaign Preset:</label>
             <div className="space-y-1.5 max-h-[140px] overflow-y-auto border border-stone-200 p-2 rounded-xl bg-white/70">
@@ -857,6 +1387,7 @@ export default function SocialMediaKit() {
               onChange={(e) => setStickerType(e.target.value as any)}
               className="w-full px-3 py-2 text-xs border-2 border-stone-900 bg-white rounded-xl focus:outline-none font-space font-medium"
             >
+              <option value="custom-creator">🎨 [STUDIO] My Custom Sticker Character & Scenery</option>
               <option value="joe-shocked">⚡ Joe — Hyper-Shocked (MrBeast Mouth Shock)</option>
               <option value="joe-laser">🔥 Joe — Determined Laser Eyes</option>
               <option value="serena-excited">⛱️ Serena — Excited Sparkle Shout!</option>
@@ -912,7 +1443,7 @@ export default function SocialMediaKit() {
             <span className="text-xs font-bold text-stone-705 block">Border Graphic Accent:</span>
             <div className="flex gap-2">
               {[
-                { id: 'retro', label: 'Thick Retro Ink' },
+                { id: 'retro', label: 'Thick Retro' },
                 { id: 'glow', label: 'Neon Glow' },
                 { id: 'minimal', label: 'Minimal Flat' }
               ].map((style) => (
@@ -930,6 +1461,265 @@ export default function SocialMediaKit() {
               ))}
             </div>
           </div>
+
+          {/* Recent Edits History Rail */}
+          <div className="space-y-2 border-t border-stone-200 pt-4">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                <History className="w-3.5 h-3.5 text-indigo-500" />
+                ⏳ Recent Edits History (Last 3)
+              </label>
+              <span className="text-[9px] font-mono bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-bold uppercase">
+                Save on Download
+              </span>
+            </div>
+            
+            {history.length === 0 ? (
+              <div className="bg-white/40 border-2 border-dashed border-stone-300 rounded-xl p-3 text-center text-[10px] text-stone-500 leading-normal">
+                No recently saved configurations. Trigger downloads or click the button below to capture active state!
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-2">
+                {history.map((snap: any, index: number) => (
+                  <div 
+                    key={snap.id || index}
+                    className="bg-white border-2 border-stone-900 p-2.5 rounded-xl shadow-[2px_2px_0px_0px_rgba(28,25,23,1)] flex items-center justify-between gap-2.5 hover:bg-stone-50 transition-all"
+                  >
+                    <button 
+                      onClick={() => loadSnapshot(snap)}
+                      className="flex-1 text-left cursor-pointer group"
+                    >
+                      <div className="font-space font-bold text-xs text-stone-900 truncate group-hover:text-[#FF6B4A] transition-colors">
+                        {snap.title || 'Untitled Design'}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5 text-[10px] text-stone-500 font-mono">
+                        <span className="bg-stone-100 px-1 py-0.2 rounded font-bold text-stone-700">{snap.presetType || 'custom'}</span>
+                        <span>{snap.timestamp}</span>
+                      </div>
+                    </button>
+                    
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => loadSnapshot(snap)}
+                        title="Revert configuration"
+                        className="p-1 hover:bg-amber-50 rounded-lg text-amber-600 transition-colors border border-transparent hover:border-amber-250 cursor-pointer"
+                      >
+                        <Undo className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => removeSnapshot(snap.id)}
+                        title="Delete Snapshot"
+                        className="p-1 hover:bg-rose-50 rounded-lg text-rose-600 transition-colors border border-transparent hover:border-rose-250 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Manual Snapshot capture trigger */}
+            <div className="flex gap-1.5">
+              <button
+                onClick={() => saveSnapshot()}
+                className="w-full py-1.5 px-3 bg-[#FAF6F0] hover:bg-stone-100 text-stone-900 text-[10px] font-bold font-space rounded-xl border-2 border-stone-900 shadow-[1.5px_1.5px_0px_0px_rgba(28,25,23,1)] flex items-center justify-center gap-1 cursor-pointer transition-all"
+              >
+                <Bookmark className="w-3.5 h-3.5 text-amber-500" />
+                <span>Save Active State to History</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-6">
+              <div className="flex items-center justify-between border-b border-stone-200 pb-3">
+                <h3 className="text-xs font-extrabold uppercase tracking-widest text-[#FF6B4A] font-mono flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-amber-500 animate-spin" /> Picnic Sticker Studio
+                </h3>
+                <span className="text-[10px] font-mono bg-stone-900 text-white px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+                  Bespoke Assets
+                </span>
+              </div>
+
+              {/* 1. Character Character Base Switcher */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-stone-700 block">Select Character Base Model:</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'joe', name: '🏄‍♂️ Joe Shore Boy', desc: 'Edgy spiky razor slits' },
+                    { id: 'serena', name: '⛱️ Serena Beach Girl', desc: 'Calm or excited flow' },
+                    { id: 'duo', name: '🧺 Dynamic Picnic Duo', desc: 'Both on the grass mat' },
+                    { id: 'watermelon_cute', name: '🍉 Baby Watermelon', desc: 'Cute rosy seeds baby' },
+                    { id: 'picnic_props', name: '📦 Gourmet Basket', desc: 'Burger & checks mat' }
+                  ].map((char) => (
+                    <button
+                      key={char.id}
+                      onClick={() => setStudioCharacter(char.id as any)}
+                      className={`p-2.5 rounded-xl border-2 text-left cursor-pointer transition-all flex flex-col justify-between h-[68px] ${
+                        studioCharacter === char.id
+                          ? 'border-stone-900 bg-amber-50 shadow-[2px_2px_0px_0px_rgba(28,25,23,1)] font-bold'
+                          : 'border-stone-200 bg-white hover:bg-stone-50'
+                      }`}
+                    >
+                      <span className="text-xs text-stone-900 block truncate">{char.name}</span>
+                      <span className="text-[9px] text-stone-500 block leading-tight font-mono">{char.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 2. Face Expressions Mode */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-stone-700 block">Expressive Face Emotion:</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { id: 'smile', label: '😀 Joy Smile' },
+                    { id: 'shock', label: '😮 MrBeast Shock' },
+                    { id: 'laser', label: '💥 Battle Lasers' },
+                    { id: 'laugh', label: '😆 squinty Laugh' },
+                    { id: 'calm', label: '😴 Zen Peace' }
+                  ].map((ex) => (
+                    <button
+                      key={ex.id}
+                      onClick={() => setStudioExpression(ex.id as any)}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg border-2 cursor-pointer transition-all ${
+                        studioExpression === ex.id
+                          ? 'border-stone-900 bg-stone-900 text-white font-bold'
+                          : 'border-stone-200 bg-white hover:bg-stone-50 text-stone-600'
+                      }`}
+                    >
+                      {ex.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 3. Beach Backdrop Scenery Design */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-stone-700 block">Backdrop Environment Scenery Sky:</label>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[
+                    { id: 'noon', label: 'noon ☀️' },
+                    { id: 'sunset', label: 'sunset 🌇' },
+                    { id: 'night', label: 'night 🌌' },
+                    { id: 'striped', label: 'stripes 🎨' }
+                  ].map((sc) => (
+                    <button
+                      key={sc.id}
+                      onClick={() => setStudioScenery(sc.id as any)}
+                      className={`py-1.5 text-[10px] uppercase font-bold font-space rounded-xl border-2 cursor-pointer text-center transition-all ${
+                        studioScenery === sc.id
+                          ? 'border-stone-900 bg-teal-50 text-teal-900 font-bold'
+                          : 'border-stone-200 bg-white hover:bg-stone-50 text-stone-600'
+                      }`}
+                    >
+                      {sc.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 4. Accessories options (multiple choices) */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-stone-700 block">Toggle Character Accessories:</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { id: 'sunglasses', label: '🕶️ Emerald Sunglasses' },
+                    { id: 'bandana', label: '🧣 Beach Bandana' },
+                    { id: 'earrings', label: '🪙 Hoop Earrings' },
+                    { id: 'palm_leaves', label: '🌴 Overhanging Palms' }
+                  ].map((acc) => {
+                    const isChecked = studioAccessories.includes(acc.id);
+                    return (
+                      <button
+                        key={acc.id}
+                        onClick={() => {
+                          if (isChecked) {
+                            setStudioAccessories(studioAccessories.filter(a => a !== acc.id));
+                          } else {
+                            setStudioAccessories([...studioAccessories, acc.id]);
+                          }
+                        }}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-xl border-2 cursor-pointer flex items-center gap-1.5 transition-all ${
+                          isChecked
+                            ? 'border-stone-900 bg-teal-50 text-teal-900 shadow-[1px_1px_0px_0px_rgba(28,25,23,1)]'
+                            : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50'
+                        }`}
+                      >
+                        <span className={`w-2.5 h-2.5 rounded-full ${isChecked ? 'bg-teal-600' : 'bg-stone-200'}`} />
+                        <span>{acc.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 5. Food / Picnic Handheld Toy Props */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-stone-700 block">Picnic Toys & Handheld items:</label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: 'none', label: 'Empty Handed' },
+                    { id: 'burger', label: '🍔 Beach Burger' },
+                    { id: 'watermelon', label: '🍉 Watermelon' },
+                    { id: 'soda', label: '🥤 Orange Soda' },
+                    { id: 'fork', label: '🍴 Pic Fork' },
+                    { id: 'sunglasses', label: '🕶️ Sunglasses' }
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setStudioHandheld(item.id as any)}
+                      className={`p-2 rounded-xl text-[11px] font-medium border-2 cursor-pointer text-center transition-all ${
+                        studioHandheld === item.id
+                          ? 'border-stone-900 bg-amber-50 text-amber-900 font-bold shadow-[1px_1px_0px_0px_rgba(28,25,23,1)]'
+                          : 'border-stone-200 bg-white hover:bg-stone-50 text-stone-600'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 6. Dynamic Color Swatches customized */}
+              <div className="grid grid-cols-2 gap-4 pt-1">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-stone-700 block">Joe T-Shirt Color:</label>
+                  <div className="flex gap-1.5">
+                    {['#F97316', '#EF4444', '#3B82F6', '#10B981', '#1C1917'].map((col) => (
+                      <button
+                        key={col}
+                        aria-label={`Select Joe T-Shirt color ${col}`}
+                        onClick={() => setStudioTeeColor(col)}
+                        style={{ backgroundColor: col }}
+                        className={`w-6 h-6 rounded-full border-2 cursor-pointer transition-transform ${
+                          studioTeeColor === col ? 'border-stone-900 scale-120 ring-2 ring-amber-300' : 'border-stone-300 hover:scale-110'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-stone-700 block">Serena Bandana Color:</label>
+                  <div className="flex gap-1.5">
+                    {['#FF6B4A', '#0D9488', '#EC4899', '#D97706', '#E2E8F0'].map((col) => (
+                      <button
+                        key={col}
+                        aria-label={`Select Serena Bandana color ${col}`}
+                        onClick={() => setStudioBandanaColor(col)}
+                        style={{ backgroundColor: col }}
+                        className={`w-6 h-6 rounded-full border-2 cursor-pointer transition-transform ${
+                          studioBandanaColor === col ? 'border-stone-900 scale-120 ring-2 ring-emerald-300' : 'border-stone-300 hover:scale-110'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right Side: Virtual HTML5/SVG Interactive Template Device Canvas */}
@@ -1035,6 +1825,96 @@ export default function SocialMediaKit() {
               <span>
                 <strong>An error occurred while zipping assets.</strong> Please try again, or make sure your browser permits canvas asset compilation.
               </span>
+            </div>
+          )}
+
+          {/* Standing Sticker Direct PNG/SVG Exporter */}
+          {activeTab === 'character_creator' && (
+            <div className="bg-white border-2 border-stone-900 rounded-2xl p-5 shadow-[2px_2px_0px_0px_rgba(28,25,23,1)] space-y-4">
+              <div className="flex items-center justify-between border-b border-stone-200 pb-2.5">
+                <h4 className="text-xs font-extrabold uppercase font-mono tracking-widest text-amber-600 flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-amber-500 animate-spin" /> Isolated Sticker Pack Export
+                </h4>
+                <span className="text-[9px] font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-bold">
+                  TRANSPARENT BG
+                </span>
+              </div>
+              
+              <div className="flex flex-col md:flex-row items-center gap-5">
+                {/* Independent sticker card representation */}
+                <div className="w-[120px] h-[120px] border-2 border-dashed border-stone-300 bg-stone-50 rounded-2xl flex items-center justify-center p-2 shrink-0 relative shadow-inner overflow-hidden">
+                  <div className="absolute inset-0 opacity-10" style={{ 
+                    backgroundImage: 'radial-gradient(#1c1917 1px, transparent 1px)', 
+                    backgroundSize: '8px 8px' 
+                  }} />
+                  <svg 
+                    id="standalone-studio-sticker" 
+                    viewBox="-110 -110 220 220" 
+                    className="w-full h-full relative z-10"
+                  >
+                    {renderStudioStickerJSX()}
+                  </svg>
+                </div>
+                
+                <div className="text-left space-y-2 flex-1">
+                  <p className="text-xs text-stone-600 leading-normal">
+                    Export your custom Picnic design as an independent <strong>high-resolution transparent sticker asset</strong>. Ideal for adding as overlays in Photoshop, Premiere, Figma, or embedding in websites directly!
+                  </p>
+                  
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={() => {
+                        const svgEl = document.getElementById("standalone-studio-sticker");
+                        if (!svgEl) return;
+                        const svgString = new XMLSerializer().serializeToString(svgEl);
+                        
+                        if (downloadFormat === 'svg') {
+                          const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+                          const url = URL.createObjectURL(svgBlob);
+                          const link = document.createElement("a");
+                          link.href = url;
+                          link.download = `cove-sticker-${studioCharacter}-${Date.now()}.svg`;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                          URL.revokeObjectURL(url);
+                        } else {
+                          const img = new Image();
+                          const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+                          const url = URL.createObjectURL(svgBlob);
+                          
+                          img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = 500;
+                            canvas.height = 500;
+                            const ctx = canvas.getContext('2d');
+                            if (ctx) {
+                              ctx.clearRect(0, 0, 500, 500);
+                              ctx.drawImage(img, 0, 0, 500, 500);
+                              const pngUrl = canvas.toDataURL("image/png");
+                              const link = document.createElement("a");
+                              link.href = pngUrl;
+                              link.download = `cove-sticker-${studioCharacter}-${Date.now()}.png`;
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }
+                            URL.revokeObjectURL(url);
+                          };
+                          img.src = url;
+                        }
+                        
+                        setCopiedNotification(true);
+                        setTimeout(() => setCopiedNotification(false), 3000);
+                      }}
+                      className="px-4 py-2 bg-amber-500 hover:bg-amber-600 border-2 border-stone-900 shadow-[2px_2px_0px_0px_rgba(28,25,23,1)] text-[#FAF6F0] font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition-all"
+                    >
+                      <Download className="w-3.5 h-3.5 text-stone-900" />
+                      <span>Download Isolated sticker ({downloadFormat.toUpperCase()})</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
