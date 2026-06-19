@@ -6,6 +6,7 @@ import TypographySpecimen from './components/TypographySpecimen';
 import ComponentShowcase from './components/ComponentShowcase';
 import AiCopywriter from './components/AiCopywriter';
 import SocialMediaKit from './components/SocialMediaKit';
+import ErrorBoundary from './components/ErrorBoundary';
 import { Compass, Palette, Type, Layers, Sparkles, AlertCircle, Quote, Image as ImageIcon } from 'lucide-react';
 
 type TabType = 'dashboard' | 'palette' | 'typography' | 'components' | 'copywriter' | 'social_kit';
@@ -100,19 +101,21 @@ export default function App() {
       {/* Main Layout Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-6 md:p-8 space-y-12">
         
-        {/* Dynamic rendering with motion fade-in */}
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className="focus:outline-none"
-          >
-            {renderContent()}
-          </motion.div>
-        </AnimatePresence>
+        {/* Dynamic rendering with motion fade-in wrapped in ErrorBoundary */}
+        <ErrorBoundary>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="focus:outline-none"
+            >
+              {renderContent()}
+            </motion.div>
+          </AnimatePresence>
+        </ErrorBoundary>
 
         {/* Global Design System Footer */}
         <footer className="pt-12 border-t border-stone-200 text-center space-y-6">
