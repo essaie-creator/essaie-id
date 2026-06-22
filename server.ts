@@ -3,13 +3,29 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import helmet from "helmet";
+import compression from "compression";
 
 dotenv.config();
 
 const app = express();
-app.use(express.json());
+const PORT = process.env.PORT || 8080;
 
-const PORT = 3000;
+// Security Middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      connectSrc: ["'self'", "https://generativelanguage.googleapis.com"],
+    },
+  },
+}));
+app.use(compression());
+app.use(express.json({ limit: '1mb' })); // Limit payload size
 
 // Lazy initialization of Gemini client
 let ai: GoogleGenAI | null = null;
@@ -84,14 +100,19 @@ async function setupServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, {
+      maxAge: '1y',
+      etag: true,
+      lastModified: true
+    }));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
+    console.log(`🚀 Server running securely on http://0.0.0.0:${PORT}`);
+    console.log(`🔒 Environment: ${process.env.NODE_ENV || 'production'}`);
   });
 }
 
