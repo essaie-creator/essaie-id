@@ -1,8 +1,54 @@
+```
+# Dependencies
 node_modules/
-build/
+
+# Build artifacts
 dist/
-coverage/
-.DS_Store
+build/
+*.bundle.js
+*.bundle.css
+
+# Environment variables
+.env
+.env.local
+.env.*
+
+# IDE and editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
 *.log
-.env*
-!.env.example
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Coverage reports
+coverage/
+htmlcov/
+
+# Python artifacts (if any Python files are present)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Vite specific
+.vite/
+
+# Lock files
+package-lock.json
+yarn.lock
+
+# Distribution folder
+dist/
+
+```

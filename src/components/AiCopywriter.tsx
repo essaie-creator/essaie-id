@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { INSTANT_COPY_TEMPLATES } from '../brandData';
-import { Copy, Check, Sparkles, AlertCircle, HelpCircle, RefreshCw } from 'lucide-react';
+import { Copy, Check, Sparkles, AlertCircle, HelpCircle, RefreshCw, LogIn, LogOut } from 'lucide-react';
 
 export default function AiCopywriter() {
   const [copyType, setCopyType] = useState<'hero_title' | 'slogan' | 'value_statement' | 'pitch' | 'social_post'>('slogan');
@@ -9,7 +9,45 @@ export default function AiCopywriter() {
   const [loading, setLoading] = useState<boolean>(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [brandLogs, setBrandLogs] = useState<any[]>([]);
-  const [errorDetails, setErrorDetails] = useState<{ message: string; isMissingKey: boolean } | null>(null);
+  const [errorDetails, setErrorDetails] = useState<{ message: string; isMissingKey: boolean; requiresAuth?: boolean } | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [authUrl, setAuthUrl] = useState<string | null>(null);
+
+  // Check URL params for OAuth callback
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const session = urlParams.get('session');
+    const authenticated = urlParams.get('authenticated');
+    
+    if (session && authenticated === 'true') {
+      setSessionId(session);
+      setIsAuthenticated(true);
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // Fetch OAuth URL for login button
+    fetch('/api/auth/url')
+      .then(res => res.json())
+      .then(data => {
+        if (data.authUrl) {
+          setAuthUrl(data.authUrl);
+        }
+      })
+      .catch(err => console.warn('OAuth not configured:', err));
+  }, []);
+
+  const handleLogin = () => {
+    if (authUrl) {
+      window.open(authUrl, '_blank', 'width=600,height=800');
+    }
+  };
+
+  const handleLogout = () => {
+    setSessionId(null);
+    setIsAuthenticated(false);
+  };
 
   // Fallback copy library based on selections
   const fallbackPresets: Record<string, string[]> = {
@@ -54,7 +92,7 @@ export default function AiCopywriter() {
       const res = await fetch("/api/generate-copy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: copyType, prompt, tone }),
+        body: JSON.stringify({ type: copyType, prompt, tone, sessionId }),
       });
 
       const data = await res.json();
@@ -83,7 +121,8 @@ export default function AiCopywriter() {
       
       setErrorDetails({
         message: err.message || "Something went wrong. Let's fall back to our verified Cove Brand Kit guidelines.",
-        isMissingKey: isMissing
+        isMissingKey: isMissing,
+        requiresAuth: true
       });
 
       // Inject verified fallback presets so user has a perfect experience
@@ -192,19 +231,50 @@ export default function AiCopywriter() {
             />
           </div>
 
-          {/* Generate Button */}
-          <button
-            onClick={generateBrandCopy}
-            disabled={loading}
-            className={`w-full py-3 text-xs font-bold font-space text-white rounded-xl border border-stone-950 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-              loading 
-                ? 'bg-stone-700 cursor-not-allowed' 
-                : 'bg-[#FF6B4A] hover:bg-[#e45331]'
-            }`}
-          >
-            {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            {loading ? "Shoring Up Copy..." : "Generate Brand Copy with Gemini"}
-          </button>
+          {/* Auth Status & Generate Button */}
+          <div className="space-y-3">
+            {/* Authentication Status */}
+            {!isAuthenticated && authUrl && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+                <p className="font-bold mb-1">🔐 No API Key? No Problem!</p>
+                <p className="mb-2">Sign in with your Google account to use Gemini without an API key.</p>
+                <button
+                  onClick={handleLogin}
+                  className="w-full py-2 bg-white border-2 border-stone-900 text-stone-900 font-bold font-space rounded-lg hover:bg-amber-100 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <LogIn className="w-4 h-4" />
+                  Sign in with Google
+                </button>
+              </div>
+            )}
+
+            {isAuthenticated && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-800 flex items-center justify-between">
+                <span>✅ Signed in with Google</span>
+                <button
+                  onClick={handleLogout}
+                  className="px-2 py-1 bg-white border border-emerald-300 rounded hover:bg-emerald-100 flex items-center gap-1 cursor-pointer"
+                >
+                  <LogOut className="w-3 h-3" />
+                  Sign Out
+                </button>
+              </div>
+            )}
+
+            {/* Generate Button */}
+            <button
+              onClick={generateBrandCopy}
+              disabled={loading}
+              className={`w-full py-3 text-xs font-bold font-space text-white rounded-xl border border-stone-950 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                loading 
+                  ? 'bg-stone-700 cursor-not-allowed' 
+                  : 'bg-[#FF6B4A] hover:bg-[#e45331]'
+              }`}
+            >
+              {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              {loading ? "Shoring Up Copy..." : "Generate Brand Copy with Gemini"}
+            </button>
+          </div>
         </div>
 
         {/* Right: Output Board */}
@@ -221,9 +291,13 @@ export default function AiCopywriter() {
             <div className="bg-[#FAF6F0] p-4 rounded-2xl border-2 border-amber-500/30 flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
               <div className="text-xs text-stone-700 leading-relaxed">
-                {errorDetails.isMissingKey ? (
+                {errorDetails.requiresAuth && !isAuthenticated ? (
                   <p>
-                    <strong>Gemini API Key is not yet configured.</strong> No worries! We've automatically loaded our verified, pre-computed design book presets below for you. To customize with real-time AI generation, assign your <strong>GEMINI_API_KEY</strong> in the <strong>Settings &gt; Secrets</strong> tab of the AI Studio control panel.
+                    <strong>Authentication Required.</strong> Sign in with your Google account above to use Gemini without an API key, or add your <strong>GEMINI_API_KEY</strong> to the environment variables.
+                  </p>
+                ) : errorDetails.isMissingKey ? (
+                  <p>
+                    <strong>Gemini API Key is not yet configured.</strong> No worries! We've automatically loaded our verified, pre-computed design book presets below for you. To customize with real-time AI generation, assign your <strong>GEMINI_API_KEY</strong> in the <strong>Settings &gt; Secrets</strong> tab of the AI Studio control panel, or sign in with Google above.
                   </p>
                 ) : (
                   <p>
